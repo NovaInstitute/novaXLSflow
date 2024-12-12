@@ -1,0 +1,71 @@
+---
+title: "Working with XLSForm in novaXLSflow"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{xlsform-overview}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+# This code block won't run until package is built,
+# we assume you have the functions from previous steps
+# installed and available in the novaXLSflow package.
+
+```
+
+# Introduction
+
+This vignette demonstrates how to parse an XLSForm, convert it into a flowchart structure,
+save it as JSON, and visualize it using novaXLSflow.
+
+## Installation
+
+If you haven’t already installed novaXLSflow, do so (adjust the GitHub username and repo as needed):
+
+```{r}
+# install.packages("devtools") # if needed
+# devtools::install_github("yourusername/novaXLSflow")
+library(novaXLSflow)
+```
+
+
+Parsing an XLSForm
+
+We placed an example XLSForm in inst/extdata/example_xlsform.xlsx within the package.
+You can access it using system.file():
+
+```{r}
+xlsform_path <- system.file("extdata", "example_xlsform.xlsx", package = "novaXLSflow")
+flowchart_data <- parse_xlsform(xlsform_path)
+
+# Examine the structure
+str(flowchart_data)
+```
+
+
+The flowchart_data is a list with nodes and edges that represent the form questions and their logical relationships.
+Saving as JSON
+
+You can save the parsed structure to JSON for further inspection or integration with other tools:
+
+```{r}
+save_flowchart_json(flowchart_data, "flowchart.json")
+```
+
+
+This will create a flowchart.json file in your working directory with a machine-readable structure of the form.
+Visualizing the Flow
+
+Use visualize_flow() to create a Graphviz-based flowchart of the XLSForm logic:
+
+```{r}
+graph <- visualize_flow(flowchart_data)
+graph
+```
+
+
+When viewed in RStudio or a browser, this will display a diagram showing each question node and edges indicating relevance conditions.
+
