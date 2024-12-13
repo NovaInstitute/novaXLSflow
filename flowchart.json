@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "personal_info",
+      "label": "Personal Information",
+      "qtype": "begin_group",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "age",
+      "label": "What is your age?",
+      "qtype": "integer",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "notes",
+      "label": "Any notes?",
+      "qtype": "text",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "items_repeat",
+      "label": "Items",
+      "qtype": "begin_repeat",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "item_count",
+      "label": "How many items?",
+      "qtype": "integer",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "total_calc",
+      "label": "sum(${item_count})",
+      "qtype": "calculate",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "purchase",
+      "label": "Will you purchase?",
+      "qtype": "select_one yes_no",
+      "stringsAsFactors": false
+    }
+  ],
+  "edges": [
+    {
+      "from": "root",
+      "to": "personal_info",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "personal_info",
+      "to": "age",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "personal_info",
+      "to": "notes",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "root",
+      "to": "items_repeat",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "items_repeat",
+      "to": "item_count",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "item_count",
+      "to": "item_count",
+      "type": "constraint",
+      "condition": "${item_count} > 0",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "items_repeat",
+      "to": "total_calc",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "item_count",
+      "to": "total_calc",
+      "type": "calculation",
+      "condition": "sum(${item_count})",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "root",
+      "to": "purchase",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "age",
+      "to": "purchase",
+      "type": "relevant",
+      "condition": "${age} >= 18",
+      "stringsAsFactors": false
+    }
+  ]
+}

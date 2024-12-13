@@ -1,15 +1,24 @@
-# test-parse_xlsform.R
-library(testthat)
-library(openxlsx)
-library(dplyr)
-
-test_that("parse_xlsform works on a minimal example", {
-        # Create a minimal XLSForm-like data frame
+test_that("parse_xlsform parses the XLSForm correctly", {
+        # Define the XLSForm data
         survey_df <- data.frame(
-                type = c("integer", "select_one yes_no", "text"),
-                name = c("age", "smoker", "comments"),
-                label = c("How old are you?", "Do you smoke?", "Any additional notes?"),
-                relevant = c(NA, "${age} >= 18", NA),
+                type = c("begin_group", "integer", "text", "end_group",
+                         "begin_repeat", "integer", "calculate", "end_repeat",
+                         "select_one yes_no"),
+                name = c("personal_info", "age", "notes", "personal_info_end",
+                         "items_repeat", "item_count", "total_calc", "items_repeat_end",
+                         "purchase"),
+                label = c("Personal Information", "What is your age?", "Any notes?", NA,
+                          "Items", "How many items?", NA, NA,
+                          "Will you purchase?"),
+                relevant = c(NA, NA, NA, NA,
+                             NA, NA, NA, NA,
+                             "${age} >= 18"),
+                constraint = c(NA, NA, NA, NA,
+                               NA, "${item_count} > 0", NA, NA,
+                               NA),
+                calculation = c(NA, NA, NA, NA,
+                                NA, NA, "sum(${item_count})", NA,
+                                NA),
                 stringsAsFactors = FALSE
         )
 
@@ -20,7 +29,7 @@ test_that("parse_xlsform works on a minimal example", {
                 stringsAsFactors = FALSE
         )
 
-        # Write these data frames to a temporary XLSX file using openxlsx
+        # Create a temporary XLSX file
         tmpfile <- tempfile(fileext = ".xlsx")
         wb <- createWorkbook()
         addWorksheet(wb, "survey")
@@ -32,25 +41,40 @@ test_that("parse_xlsform works on a minimal example", {
         # Parse the XLSForm
         flowchart_data <- parse_xlsform(tmpfile)
 
-        # Test structure of output
-        expect_type(flowchart_data, "list")
-        expect_named(flowchart_data, c("nodes", "edges"))
+        # Expected nodes
+        expected_nodes <- tibble::tibble(
+                id = c("root","personal_info","age",
+                       "notes","items_repeat","item_count","total_calc",
+                       "purchase"),
+                label = c("root","Personal Information",
+                          "What is your age?","Any notes?","Items",
+                          "How many items?","sum(${item_count})","Will you purchase?"),
+                qtype = c("root","begin_group",
+                          "integer","text","begin_repeat","integer","calculate",
+                          "select_one yes_no"),
+                stringsAsFactors = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
+        )
+
+        # Expected edges
+        expected_edges <- tibble::tibble(
+                from = c("root","personal_info",
+                         "personal_info","root","items_repeat","item_count",
+                         "items_repeat","item_count","root","age"),
+                to = c("personal_info","age","notes",
+                       "items_repeat","item_count","item_count",
+                       "total_calc","total_calc","purchase","purchase"),
+                type = c("hierarchy","hierarchy",
+                         "hierarchy","hierarchy","hierarchy","constraint",
+                         "hierarchy","calculation","hierarchy","relevant"),
+                condition = c(NA,NA,NA,NA,NA,
+                              "${item_count} > 0",NA,"sum(${item_count})",NA,"${age} >= 18"),
+                stringsAsFactors = c(FALSE,FALSE,FALSE,FALSE,
+                                     FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
+        )
 
         # Test nodes
-        expect_s3_class(flowchart_data$nodes, "data.frame")
-        expect_equal(nrow(flowchart_data$nodes), 3)
-        expect_true(all(c("id", "label", "qtype") %in% names(flowchart_data$nodes)))
-
-        # Check a node's label
-        expect_equal(flowchart_data$nodes$label[flowchart_data$nodes$id == "age"], "How old are you?")
+        expect_equal(flowchart_data$nodes, expected_nodes)
 
         # Test edges
-        expect_s3_class(flowchart_data$edges, "data.frame")
-        # There should be one edge due to the relevant condition
-        expect_equal(nrow(flowchart_data$edges), 1)
-        expect_true(all(c("from", "to", "type", "condition") %in% names(flowchart_data$edges)))
-        expect_equal(flowchart_data$edges$from, "age")
-        expect_equal(flowchart_data$edges$to, "smoker")
-        expect_equal(flowchart_data$edges$type, "relevant")
-        expect_equal(flowchart_data$edges$condition, "${age} >= 18")
+        expect_equal(flowchart_data$edges, expected_edges)
 })

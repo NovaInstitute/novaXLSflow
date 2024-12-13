@@ -4,7 +4,7 @@
 \alias{visualize_flow}
 \title{Visualize XLSForm flowchart using DiagrammeR}
 \usage{
-visualize_flow(flowchart_json)
+visualize_flow(flowchart_data)
 }
 \arguments{
 \item{flowchart_json}{A list with elements `nodes` and `edges` as produced by `parse_xlsform`.}

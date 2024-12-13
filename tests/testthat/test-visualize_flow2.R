@@ -1,29 +1,54 @@
-# tests/testthat/test-visualize_flow.R
-
-testthat::test_that("visualize_flow returns a DiagrammeR graph with correctly formatted labels and edges", {
-        # Mock flowchart data including 'root' node
-        flowchart_data <- list(
-                nodes = data.frame(
-                        id = c("root", "age", "purchase"),
-                        label = c("root", "What is your age?", "Will you purchase?"),
-                        qtype = c("root", "integer", "select_one yes_no"),
-                        stringsAsFactors = FALSE
-                ),
-                edges = data.frame(
-                        from = c("age"),
-                        to = c("purchase"),
-                        type = c("relevant"),
-                        condition = c("${age} >= 18"),
-                        stringsAsFactors = FALSE
-                )
+# tests/testthat/test-visualize_flow2.R
+testthat::test_that("parse_xlsform and visualize_flow integration works correctly for complex XLSForms", {
+        # Define the XLSForm data
+        survey_df <- data.frame(
+                type = c("begin_group", "integer", "text", "end_group",
+                         "begin_repeat", "integer", "calculate", "end_repeat",
+                         "select_one yes_no"),
+                name = c("personal_info", "age", "notes", "personal_info_end",
+                         "items_repeat", "item_count", "total_calc", "items_repeat_end",
+                         "purchase"),
+                label = c("Personal Information", "What is your age?", "Any notes?", NA,
+                          "Items", "How many items?", NA, NA,
+                          "Will you purchase?"),
+                relevant = c(NA, NA, NA, NA,
+                             NA, NA, NA, NA,
+                             "${age} >= 18"),
+                constraint = c(NA, NA, NA, NA,
+                               NA, "${item_count} > 0", NA, NA,
+                               NA),
+                calculation = c(NA, NA, NA, NA,
+                                NA, NA, "sum(${item_count})", NA,
+                                NA),
+                stringsAsFactors = FALSE
         )
 
+        choices_df <- data.frame(
+                list_name = c("yes_no", "yes_no"),
+                name = c("yes", "no"),
+                label = c("Yes", "No"),
+                stringsAsFactors = FALSE
+        )
+
+        # Create a temporary XLSX file
+        tmpfile <- tempfile(fileext = ".xlsx")
+        wb <- openxlsx::createWorkbook()
+        openxlsx::addWorksheet(wb, "survey")
+        openxlsx::writeData(wb, "survey", survey_df)
+        openxlsx::addWorksheet(wb, "choices")
+        openxlsx::writeData(wb, "choices", choices_df)
+        openxlsx::saveWorkbook(wb, tmpfile, overwrite = TRUE)
+
+        # Parse the XLSForm
+        flowchart_data <- novaXLSflow::parse_xlsform(tmpfile)
+
+        # Visualize the flow
         graph <- novaXLSflow::visualize_flow(flowchart_data)
 
-        # Check that the return is a grViz object
+        # Check that the graph is a grViz object
         testthat::expect_s3_class(graph, "grViz")
 
-        # Inspect the DOT code
+        # Extract the DOT code
         dot_code <- graph$x$diagram
 
         # Step 1: Extract node definitions from dot_code
@@ -62,14 +87,10 @@ testthat::test_that("visualize_flow returns a DiagrammeR graph with correctly fo
         expected_node_labels <- expected_nodes$label_qtype |>
                 stringr::str_escape()
 
-
-
-
         # Verify that each expected label is present in the DOT code
         for (label in expected_node_labels) {
                 testthat::expect_true(
-                        str_detect(dot_code, label),
-                        # str_detect(dot_code, digraph Flowchart)
+                        stringr::str_detect(dot_code, label),
                         info = paste("Label not found:", label)
                 )
         }
@@ -91,8 +112,9 @@ testthat::test_that("visualize_flow returns a DiagrammeR graph with correctly fo
                 }
         })
 
-        edges_extracted <- do.call(rbind, lapply(edges_extracted, as.data.frame))
-        colnames(edges_extracted) <- c("from_num", "to_num", "condition")
+        edges_extracted <- tibble(bind_rows(edges_extracted)) |>
+                mutate(condition = na_if(condition, ""))
+
 
         # Step 6: Create a lookup for node ID to number
         id_to_num <- setNames(node_map$id_num, node_map$id)

@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "id": "root",
+      "label": "root",
+      "qtype": "root",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "age",
+      "label": "How old are you?",
+      "qtype": "integer",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "smoker",
+      "label": "Do you smoke?",
+      "qtype": "select_one yes_no",
+      "stringsAsFactors": false
+    },
+    {
+      "id": "comments",
+      "label": "Any additional notes?",
+      "qtype": "text",
+      "stringsAsFactors": false
+    }
+  ],
+  "edges": [
+    {
+      "from": "root",
+      "to": "age",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "root",
+      "to": "smoker",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "age",
+      "to": "smoker",
+      "type": "relevant",
+      "condition": "${age} >= 18",
+      "stringsAsFactors": false
+    },
+    {
+      "from": "root",
+      "to": "comments",
+      "type": "hierarchy",
+      "stringsAsFactors": false
+    }
+  ]
+}

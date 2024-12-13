@@ -1,68 +1,3 @@
-#' Parse an XLSForm file into a JSON flowchart structure
-#'
-#' @param xls_path A character string path to the XLSForm file (Excel file).
-#' @return A list containing nodes and edges representing the form logic.
-#' @import openxlsx dplyr stringr jsonlite
-#' @export
-parse_xlsform <- function(xls_path) {
-        survey <- openxlsx::read.xlsx(xls_path, sheet = "survey")
-
-        # Normalize column names to lowercase
-        names(survey) <- tolower(names(survey))
-
-        # Check required columns
-        required_cols <- c("type", "name", "label")
-        missing_cols <- setdiff(required_cols, names(survey))
-        if (length(missing_cols) > 0) {
-                stop("Missing required columns in `survey` sheet: ", paste(missing_cols, collapse = ", "))
-        }
-
-        # Extract nodes
-        nodes <- survey %>%
-                dplyr::mutate(
-                        id = name,
-                        label = ifelse(is.na(label), name, label),
-                        qtype = type
-                ) %>%
-                dplyr::select(id, label, qtype)
-
-        # Function to extract variables from a relevant expression
-        extract_variables <- function(expr) {
-                if (is.na(expr)) return(character(0))
-                matches <- stringr::str_match_all(expr, "\\$\\{([^}]+)\\}")
-                unique(matches[[1]][,2]) # return variable names found inside ${...}
-        }
-
-        edges_list <- list()
-
-        for (i in seq_len(nrow(survey))) {
-                rel_expr <- survey$relevant[i]
-                if (!is.na(rel_expr)) {
-                        vars <- extract_variables(rel_expr)
-                        for (v in vars) {
-                                if (v %in% nodes$id) {
-                                        edges_list[[length(edges_list) + 1]] <- list(
-                                                from = v,
-                                                to = survey$name[i],
-                                                type = "relevant",
-                                                condition = rel_expr
-                                        )
-                                } else {
-                                        warning("Relevant condition references unknown variable: ", v)
-                                }
-                        }
-                }
-        }
-
-        edges <- if (length(edges_list) > 0) {
-                do.call(rbind, lapply(edges_list, as.data.frame))
-        } else {
-                data.frame(from = character(0), to = character(0), type = character(0), condition = character(0))
-        }
-
-        list(nodes = nodes, edges = edges)
-}
-
 #' Save flowchart data as JSON
 #'
 #' @param flowchart_json A list with elements `nodes` and `edges` as produced by `parse_xlsform`.
@@ -82,47 +17,45 @@ save_flowchart_json <- function(flowchart_json, out_file = "flowchart.json") {
 #' @return A DiagrammeR graph object.
 #' @importFrom DiagrammeR DiagrammeR
 #' @export
-visualize_flow <- function(flowchart_json) {
-        nodes <- flowchart_json$nodes
-        edges <- flowchart_json$edges
+visualize_flow <- function(flowchart_data) {
+        library(DiagrammeR)
 
-        # Map nodes to numeric IDs
-        node_map <- data.frame(
-                id_num = seq_len(nrow(nodes)),
-                id = nodes$id,
-                stringsAsFactors = FALSE
-        )
+        nodes <- flowchart_data$nodes
+        edges <- flowchart_data$edges
 
-        # Build node statements
-        node_statements <- apply(node_map, 1, function(row) {
-                label_txt <- nodes$label[nodes$id == row[2]]
-                qtype_txt <- nodes$qtype[nodes$id == row[2]]
-                paste0(row[1], " [label = \"", label_txt, " (", qtype_txt, ")\"]")
-        })
+        graph_code <- "digraph Flowchart {"
 
-        # Build edge statements
-        edge_statements <- character(0)
-        if (nrow(edges) > 0) {
-                edge_statements <- apply(edges, 1, function(e) {
-                        from_id <- node_map$id_num[node_map$id == e["from"]]
-                        to_id <- node_map$id_num[node_map$id == e["to"]]
-                        cond <- if (!is.na(e["condition"]) && nchar(e["condition"]) > 0) {
-                                paste0(" [label=\"", e["condition"], "\"]")
-                        } else {
-                                ""
-                        }
-                        paste0(from_id, " -> ", to_id, cond)
-                })
+        node_ids <- nodes$id
+        node_numbers <- setNames(seq_along(node_ids), node_ids)
+
+        for (i in seq_along(node_ids)) {
+                n_id <- node_ids[i]
+                n <- nodes[nodes$id == n_id,]
+                # label = "label (qtype)"
+                label <- stringr::str_squish(paste0(n$label, " (", n$qtype, ")")) |>
+                        str_replace_all(pattern = "'s ", replacement =  "s ")
+                graph_code <- paste0(graph_code, "\n    ", node_numbers[[n_id]], " [label = \"", label, "\"];")
         }
 
-        graph_code <- paste0(
-                "digraph xlsform {\n",
-                "  rankdir=LR;\n",
-                "  ", paste(node_statements, collapse = "\n  "), "\n\n",
-                "  ", paste(edge_statements, collapse = "\n  "), "\n",
-                "}"
-        )
+        for (i in seq_len(nrow(edges))) {
+                e <- edges[i,]
+                if (e$from %in% node_ids && e$to %in% node_ids) {
+                        from_num <- node_numbers[[e$from]]
+                        to_num <- node_numbers[[e$to]]
+                        if (!is.na(e$condition) && nzchar(e$condition)) {
+                                graph_code <- paste0(graph_code, "\n    ", from_num, " -> ", to_num, " [label=\"", e$condition, "\"];")
+                        } else {
+                                graph_code <- paste0(graph_code, "\n    ", from_num, " -> ", to_num, ";")
+                        }
+                } else {
+                        # If edge references missing nodes, let's produce a warning.
+                        # The user mentioned it's dangerous to remove warnings and skip silently.
+                        warning(paste("Edge references missing node:", e$from, "->", e$to, "Skipping edge."))
+                }
+        }
 
-        # Use grViz to return a grViz htmlwidget
-        DiagrammeR::grViz(graph_code)
+        graph_code <- paste0(graph_code, "\n}")
+        diagram <- DiagrammeR::grViz(graph_code)
+        DiagrammeR::is_property_graph(graph)
+        diagram
 }

@@ -38,7 +38,45 @@ We placed an example XLSForm in inst/extdata/example_xlsform.xlsx within the pac
 You can access it using system.file():
 
 ```{r}
-xlsform_path <- system.file("extdata", "example_xlsform.xlsx", package = "novaXLSflow")
+library(openxlsx)
+survey_df <- data.frame(
+        type = c("begin_group", "integer", "text", "end_group",
+                 "begin_repeat", "integer", "calculate", "end_repeat",
+                 "select_one yes_no"),
+        name = c("personal_info", "age", "notes", "personal_info_end",
+                 "items_repeat", "item_count", "total_calc", "items_repeat_end",
+                 "purchase"),
+        label = c("Personal Information", "What is your age?", "Any notes?", NA,
+                  "Items", "How many items?", NA, NA,
+                  "Will you purchase?"),
+        relevant = c(NA, NA, NA, NA,
+                     NA, NA, NA, NA,
+                     "${age} >= 18"),
+        constraint = c(NA, NA, NA, NA,
+                       NA, "${item_count} > 0", NA, NA,
+                       NA),
+        calculation = c(NA, NA, NA, NA,
+                        NA, NA, "sum(${item_count})", NA,
+                        NA),
+        stringsAsFactors = FALSE
+)
+
+choices_df <- data.frame(
+        list_name = c("yes_no", "yes_no"),
+        name = c("yes", "no"),
+        label = c("Yes", "No"),
+        stringsAsFactors = FALSE
+)
+
+# Create a temporary XLSX file
+tmpfile <- tempfile(fileext = ".xlsx")
+wb <- createWorkbook()
+addWorksheet(wb, "survey")
+writeData(wb, "survey", survey_df)
+addWorksheet(wb, "choices")
+writeData(wb, "choices", choices_df)
+saveWorkbook(wb, tmpfile, overwrite = TRUE)
+
 flowchart_data <- parse_xlsform(xlsform_path)
 
 # Examine the structure
@@ -69,3 +107,31 @@ graph
 
 When viewed in RStudio or a browser, this will display a diagram showing each question node and edges indicating relevance conditions.
 
+## A More Complex Example
+
+Let's consider a more complex XLSForm that includes groups, repeat groups, constraints, and calculations. Suppose we have the following structure:
+
+- A "Personal Information" group with questions about the respondent.
+- A repeat group to capture multiple items, each with a constraint and a calculation to sum them.
+- A purchase question that is only relevant if the respondent is an adult.
+
+We'll create and parse this XLSForm directly in the vignette (for demonstration):
+
+```{r}
+
+flowchart_data <- parse_xlsform(tmpfile)
+str(flowchart_data)
+```
+
+In this output, you will see:
+•	Multiple nodes representing groups, questions, and calculate fields.
+•	Edges representing relevant conditions, constraints, calculations, and hierarchy.
+
+You can then visualize this more complex form:
+
+```{r}
+graph <- visualize_flow(flowchart_data)
+graph
+```
+
+This more complex example shows how novaXLSflow can handle advanced XLSForm logic and structure, providing a richer understanding of your form’s logic.
