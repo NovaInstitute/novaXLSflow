@@ -19,13 +19,13 @@
 #' @examples
 #' \dontrun{
 #' survey_df <- data.frame(
-#'   type = c("begin_group", "integer", "text", "end_group"),
-#'   name = c("personal_info", "age", "notes", "personal_info_end"),
-#'   label = c("Personal Info", "Your age?", "Any notes?", NA),
-#'   relevant = c(NA, NA, NA, NA),
-#'   constraint = c(NA, NA, NA, NA),
-#'   calculation = c(NA, NA, NA, NA),
-#'   stringsAsFactors = FALSE
+#'         type = c("begin_group", "integer", "text", "end_group"),
+#'         name = c("personal_info", "age", "notes", "personal_info_end"),
+#'         label = c("Personal Info", "Your age?", "Any notes?", NA),
+#'         relevant = c(NA, NA, NA, NA),
+#'         constraint = c(NA, NA, NA, NA),
+#'         calculation = c(NA, NA, NA, NA),
+#'         stringsAsFactors = FALSE
 #' )
 #' hierarchy <- build_hierarchy(survey_df)
 #' }
@@ -66,7 +66,6 @@ build_hierarchy <- function(survey_df) {
 
                         cli::cli_alert_info("Added {tp} node '{nm}' as a child of '{current_parent$id}'")
                         cli::cli_text("Pushed '{nm}' onto the stack")
-
                 } else if (grepl("^end_group", tp) || grepl("^end_repeat", tp)) {
                         # End the current group or repeat
                         if (length(stack) == 1) {
@@ -79,7 +78,6 @@ build_hierarchy <- function(survey_df) {
                         stack <- stack[-length(stack)]
 
                         cli::cli_alert_info("Ended {tp}. Popped '{popped_node$id}' from the stack. Current top: '{stack[[length(stack)]]$id}'")
-
                 } else {
                         # It's a question or calculation node
                         q_node <- create_node(nm, lb, tp, rel, con, cal)
